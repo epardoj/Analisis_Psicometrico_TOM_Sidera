@@ -1,0 +1,458 @@
+---
+title: "resultados"
+output: word_document
+date: "2024-03-30"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r, include=FALSE}
+library(flextable)
+library(knitr)
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(psych)
+library(modeest)
+library(ltm)
+library(lavaan)
+library(semPlot)
+library(dplyr)
+library(eRm)
+library(difR)
+library(plotly)
+library(ggpubr)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+base_de_datos <- read_excel("base de datos.xlsx", 
+    sheet = "Datos")
+set.seed(1234)
+ind <- sample(2, nrow(base_de_datos), replace = T, prob = c(0.5, 0.5))
+#data1 <- base_de_datos 
+data1 <- base_de_datos[ind == 1,]
+data2 <- base_de_datos[ind == 2,]
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+sociodemograficos <- subset(data1, select=c(edad, sexo, Total))
+sociodemograficos$sexo <- factor(sociodemograficos$sexo, labels = c('Femenino', 'Masculino'))
+tareas <- subset(data1, select=c(-edad, -sexo, -Total))
+tareas[is.na(tareas)] <- 0
+tareas <- replace(tareas, tareas == 11, 1)
+tabla <- psych::describe(subset(sociodemograficos, select=c(edad,Total)))
+tabla <- cbind(tabla, Mode = c(mfv(sociodemograficos$edad), mfv(sociodemograficos$Total)))
+tabla <- cbind(tabla, Variables = c('Edad', 'Total'))
+tabla1 <- subset(tabla, select=c(Variables,mean,median,Mode, sd, min, max, se)) 
+descriptivos <- flextable(tabla1)
+descriptivos %>% autofit() %>% align(align= 'center', part = 'all')
+```
+
+```{r}
+sexo <- round(table(sociodemograficos$sexo),2)
+porc_sexo <- round(prop.table(sexo)*100,2)
+Total_sexo <- data.frame(sexo,porc_sexo)
+Total_sexo <- subset(Total_sexo,select = c(Var1, Freq, Freq.1))
+names(Total_sexo) <- c('Sexo', 'Cantidad', '%')
+Total_sexo <- flextable(Total_sexo); 
+Total_sexo %>% autofit() %>% align(align= 'center', part = 'all')
+barplot(sexo, main = 'Sexo de los participantes', ylab = 'Cantidad', col = 'royalblue')
+```
+
+
+## Análisis de fiabilidad   
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+KR20 <- function(responses) {
+  # Get number of items (N) and individuals
+  n_items <- ncol(responses)
+  n_persons <- nrow(responses)
+  # get p_j for each item
+  p <- colMeans(responses)
+  # Get Total scores (X)
+  x <- rowSums(responses)
+  # observed score variance
+  var_x <- var(x) * (n_persons - 1) / n_persons
+  # Apply KR-20 formula
+  rel <- (n_items / (n_items - 1)) * (1 - sum(p * (1 - p)) / var_x)
+  
+  rel
+}
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+KR20_sin_elemento <- list()
+for (i in 1:length(tareas)) {
+  base <- tareas[,-i]
+  calculo <- round(KR20(base), 3)
+  KR20_sin_elemento[[i]] <- c(calculo)
+}
+KR20_sin_elemento <- as.numeric(KR20_sin_elemento)
+suma <- colSums(tareas)
+proporcion <- round(colSums(tareas)/length(tareas$tarea_1), 3)
+globales <- sociodemograficos$Total
+corbispun <- round(as.numeric(lapply(tareas, biserial.cor, x = globales, level=2)), 3)
+fiabilidad <- round(KR20(tareas), 3)
+Tareas <- names(tareas)
+df <- data.frame(Tareas, suma, proporcion, corbispun, fiabilidad, KR20_sin_elemento)
+names(df) <- c('Tareas','Aciertos','Dificultad', 'Correlación BP', 'KR-20', 'fiabilidad sin elemento')
+ft <- flextable(df)
+ft %>% autofit() %>% align(align= 'center', part = 'all')
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+tareapruebas <- subset(tareas, select = c(-Task_3))
+KR20_sin_elemento <- list()
+for (i in 1:length(tareapruebas)) {
+  base <- tareapruebas[,-i]
+  calculo <- round(KR20(base), 3)
+  KR20_sin_elemento[[i]] <- c(calculo)
+}
+KR20_sin_elemento <- as.numeric(KR20_sin_elemento)
+suma <- colSums(tareapruebas)
+proporcion <- round(colSums(tareapruebas)/length(tareapruebas$Task_17), 3)
+globales <- data1$Total - data1$Task_3
+corbispun <- round(as.numeric(lapply(tareapruebas, biserial.cor, x = globales, level=2)), 3)
+fiabilidad <- round(KR20(tareapruebas), 3)
+Tareas_p <- names(tareapruebas)
+dfp <- data.frame(Tareas_p, suma, proporcion, corbispun, fiabilidad, KR20_sin_elemento)
+names(dfp) <- c('Tareas','Aciertos','Dificultad', 'Correlación BP', 'KR-20', 'fiabilidad sin elemento')
+ft <- flextable(dfp)
+ft %>% autofit() %>% align(align= 'center', part = 'all')
+```
+
+_
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+tareapruebas <- subset(tareas, select = c(-Task_3, -Task_2))
+KR20_sin_elemento <- list()
+for (i in 1:length(tareapruebas)) {
+  base <- tareapruebas[,-i]
+  calculo <- round(KR20(base), 3)
+  KR20_sin_elemento[[i]] <- c(calculo)
+}
+KR20_sin_elemento <- as.numeric(KR20_sin_elemento)
+suma <- colSums(tareapruebas)
+proporcion <- round(colSums(tareapruebas)/length(tareapruebas$Task_17), 3)
+globales <- data1$Total - (data1$Task_3+data1$Task_2)
+corbispun <- round(as.numeric(lapply(tareapruebas, biserial.cor, x = globales, level=2)), 3)
+fiabilidad <- round(KR20(tareapruebas), 3)
+Tareas_p <- names(tareapruebas)
+dfp1 <- data.frame(Tareas_p, suma, proporcion, corbispun, fiabilidad, KR20_sin_elemento)
+names(dfp1) <- c('Tareas','Aciertos','Dificultad', 'Correlación BP', 'KR-20', 'fiabilidad sin elemento')
+ft <- flextable(dfp1)
+ft %>% autofit() %>% align(align= 'center', part = 'all')
+```
+
+_
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+tareapruebas <- subset(tareas, select = c(-Task_3, -Task_2, -Task_4))
+KR20_sin_elemento <- list()
+for (i in 1:length(tareapruebas)) {
+  base <- tareapruebas[,-i]
+  calculo <- round(KR20(base), 3)
+  KR20_sin_elemento[[i]] <- c(calculo)
+}
+KR20_sin_elemento <- as.numeric(KR20_sin_elemento)
+suma <- colSums(tareapruebas)
+proporcion <- round(colSums(tareapruebas)/length(tareapruebas$Task_17), 3)
+globales <- data1$Total - (data1$Task_3+data1$Task_2+data1$Task_4)
+corbispun <- round(as.numeric(lapply(tareapruebas, biserial.cor, x = globales, level=2)), 3)
+fiabilidad <- round(KR20(tareapruebas), 3)
+Tareas_p <- names(tareapruebas)
+dfp2 <- data.frame(Tareas_p, suma, proporcion, corbispun, fiabilidad, KR20_sin_elemento)
+names(dfp2) <- c('Tareas','Aciertos','Dificultad', 'Correlación BP', 'KR-20', 'fiabilidad sin elemento')
+ft <- flextable(dfp2)
+ft %>% autofit() %>% align(align= 'center', part = 'all')
+```
+
+_
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+tareapruebas <- subset(tareas, select = c(-Task_3, -Task_2, -Task_4, -Task_1))
+KR20_sin_elemento <- list()
+for (i in 1:length(tareapruebas)) {
+  base <- tareapruebas[,-i]
+  calculo <- round(KR20(base), 3)
+  KR20_sin_elemento[[i]] <- c(calculo)
+}
+KR20_sin_elemento <- as.numeric(KR20_sin_elemento)
+suma <- colSums(tareapruebas)
+proporcion <- round(colSums(tareapruebas)/length(tareapruebas$Task_17), 3)
+globales <- data1$Total - (data1$Task_3+data1$Task_2+data1$Task_4+data1$Task_1)
+corbispun <- round(as.numeric(lapply(tareapruebas, biserial.cor, x = globales, level=2)), 3)
+fiabilidad <- round(KR20(tareapruebas), 3)
+Tareas_p <- names(tareapruebas)
+dfp3 <- data.frame(Tareas_p, suma, proporcion, corbispun, fiabilidad, KR20_sin_elemento)
+names(dfp3) <- c('Tareas','Aciertos','Dificultad', 'Correlación BP', 'KR-20', 'fiabilidad sin elemento')
+ft <- flextable(dfp3)
+ft %>% autofit() %>% align(align= 'center', part = 'all')
+```
+
+_
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+tareapruebas <- subset(tareas, select = c(-Task_3, -Task_2, -Task_4, -Task_1, -Task_5))
+KR20_sin_elemento <- list()
+for (i in 1:length(tareapruebas)) {
+  base <- tareapruebas[,-i]
+  calculo <- round(KR20(base), 3)
+  KR20_sin_elemento[[i]] <- c(calculo)
+}
+KR20_sin_elemento <- as.numeric(KR20_sin_elemento)
+suma <- colSums(tareapruebas)
+proporcion <- round(colSums(tareapruebas)/length(tareapruebas$Task_17), 3)
+globales <- data1$Total - (data1$Task_3+data1$Task_2+data1$Task_4+data1$Task_1+data1$Task_5)
+corbispun <- round(as.numeric(lapply(tareapruebas, biserial.cor, x = globales, level=2)), 3)
+fiabilidad <- round(KR20(tareapruebas), 3)
+Tareas_p <- names(tareapruebas)
+dfp4 <- data.frame(Tareas_p, suma, proporcion, corbispun, fiabilidad, KR20_sin_elemento)
+names(dfp4) <- c('Tareas','Aciertos','Dificultad', 'Correlación BP', 'KR-20', 'fiabilidad sin elemento')
+ft <- flextable(dfp4)
+ft %>% autofit() %>% align(align= 'center', part = 'all')
+```
+
+
+```{r}
+df2 <- cbind(df, num_tarea = c(1:17))
+limite <- paste0('KR-20 general = ', df2$`KR-20`[1])
+g1 <- ggplot(df2, aes(x= num_tarea, y= `fiabilidad sin elemento`)) + geom_path() + geom_point(color='blue') + geom_hline(yintercept = df2$`KR-20`[1], linetype = 1, color = 2, lwd = 1) + xlab('') + ylab('') + scale_x_continuous(breaks = df2$num_tarea)+ scale_y_continuous(breaks = seq(min(df2$`fiabilidad sin elemento`)-2, max(df2$`fiabilidad sin elemento`)+2, by = 0.002))+ geom_text(x = 12, y = df2$`KR-20`[1]-0.002, label = limite) + theme_classic() + ggtitle('') + theme(plot.title = element_text(size = 10, hjust = 0.5), axis.title = element_text(size = 10), axis.text = element_text(size = 8))
+
+df2 <- cbind(dfp, num_tarea = c(1,2,4,5,6,7,8,9,10,11,12,13,14,15,16,17))
+limite <- paste0('KR-20 general = ', df2$`KR-20`[1])
+g2 <- ggplot(df2, aes(x= num_tarea, y= `fiabilidad sin elemento`)) + geom_path() + geom_point(color='blue') + geom_hline(yintercept = df2$`KR-20`[1], linetype = 1, color = 2, lwd = 1) + xlab('') + ylab('') + scale_y_continuous(breaks = seq(min(df2$`fiabilidad sin elemento`)-2, max(df2$`fiabilidad sin elemento`)+2, by = 0.002))+ scale_x_continuous(breaks = df2$num_tarea)+ geom_text(x = 12, y = df2$`KR-20`[1]-0.002, label = limite) + theme_classic() + ggtitle('') + theme(plot.title = element_text(size = 10, hjust = 0.5), axis.title = element_text(size = 10), axis.text = element_text(size = 8))
+
+df2 <- cbind(dfp1, num_tarea = c(1,4,5,6,7,8,9,10,11,12,13,14,15,16,17))
+limite <- paste0('KR-20 general = ', df2$`KR-20`[1])
+g3 <- ggplot(df2, aes(x= num_tarea, y= `fiabilidad sin elemento`)) + geom_path() + geom_point(color='blue') + geom_hline(yintercept = df2$`KR-20`[1], linetype = 1, color = 2, lwd = 1) + xlab('') + ylab('') + scale_y_continuous(breaks = seq(min(df2$`fiabilidad sin elemento`)-2, max(df2$`fiabilidad sin elemento`)+2, by = 0.002))+ scale_x_continuous(breaks = df2$num_tarea)+ geom_text(x = 12, y = df2$`KR-20`[1]-0.002, label = limite) + theme_classic() + ggtitle('') + theme(plot.title = element_text(size = 10, hjust = 0.5), axis.title = element_text(size = 10), axis.text = element_text(size = 8))
+
+df2 <- cbind(dfp2, num_tarea = c(1,5,6,7,8,9,10,11,12,13,14,15,16,17))
+limite <- paste0('KR-20 general = ', df2$`KR-20`[1])
+g4 <- ggplot(df2, aes(x= num_tarea, y= `fiabilidad sin elemento`)) + geom_path() + geom_point(color='blue') + geom_hline(yintercept = df2$`KR-20`[1], linetype = 1, color = 2, lwd = 1) + xlab('') + ylab('') + scale_y_continuous(breaks = seq(min(df2$`fiabilidad sin elemento`)-2, max(df2$`fiabilidad sin elemento`)+2, by = 0.002))+ scale_x_continuous(breaks = df2$num_tarea)+ geom_text(x = 12, y = df2$`KR-20`[1]-0.002, label = limite) + theme_classic() + ggtitle('') + theme(plot.title = element_text(size = 10, hjust = 0.5), axis.title = element_text(size = 10), axis.text = element_text(size = 8))
+
+df2 <- cbind(dfp3, num_tarea = c(5,6,7,8,9,10,11,12,13,14,15,16,17))
+limite <- paste0('KR-20 general = ', df2$`KR-20`[1])
+g5 <- ggplot(df2, aes(x= num_tarea, y= `fiabilidad sin elemento`)) + geom_path() + geom_point(color='blue') + geom_hline(yintercept = df2$`KR-20`[1], linetype = 1, color = 2, lwd = 1) + xlab('') + ylab('') + scale_y_continuous(breaks = seq(min(df2$`fiabilidad sin elemento`)-2, max(df2$`fiabilidad sin elemento`)+2, by = 0.002))+ scale_x_continuous(breaks = df2$num_tarea)+ geom_text(x = 12, y = df2$`KR-20`[1]-0.002, label = limite) + theme_classic() + ggtitle('') + theme(plot.title = element_text(size = 10, hjust = 0.5), axis.title = element_text(size = 10), axis.text = element_text(size = 8))
+
+df2 <- cbind(dfp4, num_tarea = c(6,7,8,9,10,11,12,13,14,15,16,17))
+limite <- paste0('KR-20 general = ', df2$`KR-20`[1])
+g6 <- ggplot(df2, aes(x= num_tarea, y= `fiabilidad sin elemento`)) + geom_path() + geom_point(color='blue') + geom_hline(yintercept = df2$`KR-20`[1], linetype = 1, color = 2, lwd = 1) + xlab('') + ylab('') + scale_y_continuous(breaks = seq(min(df2$`fiabilidad sin elemento`)-2, max(df2$`fiabilidad sin elemento`)+2, by = 0.002))+ scale_x_continuous(breaks = df2$num_tarea)+ geom_text(x = 12, y = df2$`KR-20`[1]-0.002, label = limite) + theme_classic() + ggtitle('') + theme(plot.title = element_text(size = 10, hjust = 0.5), axis.title = element_text(size = 10), axis.text = element_text(size = 8))
+
+gt <- ggarrange(g1, g2, g3, g4, g5, g6, ncol = 2, nrow = 3)
+annotate_figure(gt, top = text_grob('Reliability indices after removing a task.', size = 14), left = text_grob('Reliability without the item (KR-20).', rot = 90, size = 12), bottom =  text_grob('Removed task', size = 12))
+```
+
+## Validez de constructo
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+modelo1 <- 'TOM =~ Task_1 + Task_2 + Task_3 + Task_4 + Task_5 + Task_6 +
+Task_7 + Task_8 + Task_9 + Task_10 + Task_11 + Task_12 + Task_13 +
+Task_14 + Task_15 + Task_16 + Task_17'
+
+modelo2 <- 'TOM =~ Task_1 +  Task_3 + Task_4 + Task_5 + Task_6 +
+Task_7 + Task_8 + Task_9 + Task_10 + Task_11 + Task_12 + Task_13 +
+Task_14 + Task_15 + Task_16 + Task_17'
+
+modelo3 <- 'TOM =~ Task_1 + Task_4 + Task_5 + Task_6 +
+Task_7 + Task_8 + Task_9 + Task_10 + Task_11 + Task_12 + Task_13 +
+Task_14 + Task_15 + Task_16 + Task_17'
+
+modelo4 <- 'TOM =~ Task_4 + Task_5 + Task_6 +
+Task_7 + Task_8 + Task_9 + Task_10 + Task_11 + Task_12 + Task_13 +
+Task_14 + Task_15 + Task_16 + Task_17'
+
+modelo5 <- 'TOM =~ Task_5 + Task_6 +
+Task_7 + Task_8 + Task_9 + Task_10 + Task_11 + Task_12 + Task_13 +
+Task_14 + Task_15 + Task_16 + Task_17'
+
+modelo6 <- 'TOM =~ Task_6 +
+Task_7 + Task_8 + Task_9 + Task_10 + Task_11 + Task_12 + Task_13 +
+Task_14 + Task_15 + Task_16 + Task_17'
+
+fit1 <- cfa(model = modelo1, data = tareas, estimator = 'DWLS', ordered = names(tareas))
+fit2 <- cfa(model = modelo2, data = tareas, estimator = 'DWLS', ordered = names(tareas))
+fit3 <- cfa(model = modelo3, data = tareas, estimator = 'DWLS', ordered = names(tareas))
+fit4 <- cfa(model = modelo4, data = tareas, estimator = 'DWLS', ordered = names(tareas))
+fit5 <- cfa(model = modelo5, data = tareas, estimator = 'DWLS', ordered = names(tareas))
+fit6 <- cfa(model = modelo6, data = tareas, estimator = 'DWLS', ordered = names(tareas))
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+estimadores1 <- fitMeasures(fit1, c('chisq','df','pvalue','cfi', 'gfi', 'tli', 'rmsea', 'srmr'))#; estimadores1
+estimadores2 <- fitMeasures(fit2, c('chisq','df','pvalue','cfi', 'gfi', 'tli', 'rmsea', 'srmr'))#; estimadores2
+estimadores3 <- fitMeasures(fit3, c('chisq','df','pvalue','cfi', 'gfi', 'tli', 'rmsea', 'srmr'))#; estimadores3
+estimadores4 <- fitMeasures(fit4, c('chisq','df','pvalue','cfi', 'gfi', 'tli', 'rmsea', 'srmr'))#; estimadores4
+estimadores5 <- fitMeasures(fit5, c('chisq','df','pvalue','cfi', 'gfi', 'tli', 'rmsea', 'srmr'))#; estimadores5
+estimadores6 <- fitMeasures(fit6, c('chisq','df','pvalue','cfi', 'gfi', 'tli', 'rmsea', 'srmr'))#; estimadores6
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+estimador <- list(Modelos <- c('Modelo 1', 'Modelo 2', 'Modelo 3', 'Modelo 4', 'Modelo 5', 'Modelo 6'),
+                  χ2 <- c(492.52, 389.96, 276.10, 265.06, 198.12, 172.35),
+                  sig_χ2 <- c(0.00, 0.00, 0.00, 0.00, 0.00, 0.00),
+                  gl <- c(119, 104, 90, 77, 65, 54),
+                  CFI <- c(0.976,0.981, 0.988, 0.988, 0.991, 0.992),
+                  GFI <- c(0.970, 0.976, 0.983, 0.983, 0.987, 0.989),
+                  TLI <- c(0.972, 0.978,0.986,0.985, 0.989, 0.990),
+                  RMSEA <- c(0.114, 0.106, 0.092, 0.100, 0.092, 0.095),
+                  SRMR <- c(0.175,0.167, 0.143, 0.134, 0.110, 0.107))
+estimadores <- data.frame(estimador)
+names(estimadores) <- c('Modelos','χ2','sig_χ2','gl','CFI','GFI','TLI','RMSEA','SRMR')
+apaEstimador <- flextable(estimadores)
+apaEstimador %>% autofit() %>% align(align= 'center', part = 'all')
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+semPaths(fit6, intercepts = F,edge.label.cex=1, sizeMan = 4, sizeInt=2,edge.color ="black", label.prop=1,sizeLat = 5,"std", layout="circle2", edge.width = 0.5, bg= 'white'); title('Model 6', line = 3)
+```
+
+### Análisis desde la teoría de respuesta al ítem
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+sociodemograficos2 <- subset(data2, select=c(edad, sexo, Total))
+sociodemograficos2$sexo <- factor(sociodemograficos2$sexo, labels = c('Femenino', 'Masculino'))
+tareas2 <- subset(data2, select=c(-edad, -sexo, -Total))
+tareas2[is.na(tareas2)] <- 0
+tareas2 <- replace(tareas2, tareas2 == 11, 1)
+tabla2 <- psych::describe(subset(sociodemograficos2, select=c(edad,Total)))
+tabla2 <- cbind(tabla2, Mode = c(mfv(sociodemograficos2$edad), mfv(sociodemograficos2$Total)))
+tabla2 <- cbind(tabla2, Variables = c('Edad', 'Total'))
+tabla3 <- subset(tabla2, select=c(Variables,mean,median,Mode, sd, min, max, se)) 
+descriptivos2 <- flextable(tabla3)
+descriptivos2 %>% autofit() %>% align(align= 'center', part = 'all')
+```
+_
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+sexo2 <- round(table(sociodemograficos2$sexo),2)
+porc_sexo2 <- round(prop.table(sexo2)*100,2)
+Total_sexo2 <- data.frame(sexo2,porc_sexo2)
+Total_sexo2 <- subset(Total_sexo2,select = c(Var1, Freq, Freq.1))
+names(Total_sexo2) <- c('Sexo', 'Cantidad', '%')
+Total_sexo2 <- flextable(Total_sexo2); 
+Total_sexo2 %>% autofit() %>% align(align= 'center', part = 'all')
+barplot(sexo2, main = 'Sexo de los participantes', ylab = 'Cantidad', col = 'chartreuse4')
+```
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+tareasTRI <- subset(tareas2, select = c(-Task_1, -Task_2, -Task_3, -Task_4, -Task_5))
+KR20_sin_elemento <- list()
+for (i in 1:length(tareasTRI)) {
+  base <- tareasTRI[,-i]
+  calculo <- round(KR20(base), 3)
+  KR20_sin_elemento[[i]] <- c(calculo)
+}
+KR20_sin_elemento <- as.numeric(KR20_sin_elemento)
+suma <- colSums(tareasTRI)
+proporcion <- round(colSums(tareasTRI)/length(tareasTRI$Task_17), 3)
+globales <- data2$Total - (data2$Task_1+data2$Task_2+data2$Task_3+data2$Task_4+data2$Task_5)
+corbispun <- round(as.numeric(lapply(tareasTRI, biserial.cor, x = globales, level=2)), 3)
+fiabilidad <- round(KR20(tareasTRI), 3)
+Tareas_2 <- names(tareasTRI)
+df3 <- data.frame(Tareas_2, suma, proporcion, corbispun, fiabilidad, KR20_sin_elemento)
+names(df3) <- c('Tareas','Aciertos','Dificultad', 'Correlación BP', 'KR-20', 'fiabilidad sin elemento')
+ft <- flextable(df3)
+ft %>% autofit() %>% align(align= 'center', part = 'all')
+```
+
+```{r}
+df2 <- cbind(df3, num_tarea = c(6:17))
+limite <- paste0('KR-20 general = ', df2$`KR-20`[1])
+g7 <- ggplot(df2, aes(x= num_tarea, y= `fiabilidad sin elemento`)) + geom_path() + geom_point(color='blue') + geom_hline(yintercept = df2$`KR-20`[1], linetype = 1, color = 2, lwd = 1) + xlab('\nTarea retirada') + ylab('Fiabilidad sin elemento (KR-20)\n') + scale_y_continuous(breaks = seq(min(df2$`fiabilidad sin elemento`)-2, max(df2$`fiabilidad sin elemento`)+2, by = 0.002))+ scale_x_continuous(breaks = df2$num_tarea)+ geom_text(x = 14, y = df2$`KR-20`[1]-0.002, label = limite) + theme_classic() + ggtitle('Indices de fiabilidad al retirar cada tarea\n') + theme(plot.title = element_text(size = 10, hjust = 0.5), axis.title = element_text(size = 10), axis.text = element_text(size = 8))
+g7
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+modeloRash <- RM(tareasTRI)
+betas <- -coef(modeloRash)
+
+dfbetas <- flextable(data.frame('Tareas' = c('Task 9', 'Task 10', 'Task 6', 'Task 8',
+                                   'Task 7', 'Task 14', 'Task 15', 'Task 17', 'Task 11',
+                                   'Task 12', 'Task 13', 'Task 16'),'Betas' = round(sort(betas), 2)))
+
+dfbetas %>% autofit() %>% align(align= 'center', part = 'all')
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#par(mfrow = c(1,2), ymax = 1.2)
+plotjointICC(modeloRash, item.subset =  1:6, cex = .8, main = 'CCI de la tarea 6 a 11', legpos = 'bottomright')
+plotjointICC(modeloRash, item.subset =  7:12, cex = .8, main = 'CCI de la tarea 12 a 17', legpos = 'bottomright')
+
+plotjointICC(modeloRash, item.subset =  1:12, cex = .8, main = 'ICC of the Total tasks (Item Characteristic Curve)', legpos = 'bottomright')
+```
+
+```{r}
+summary(modeloRash)
+```
+
+```{r}
+plotPImap(modeloRash, cex.gen = .9, main='Person - item Map', sorted = T)
+```
+
+```{r}
+summary(modeloRash)
+eta_tarea5 <- -sum(modeloRash$etapar)
+```
+### Ajuste del modelo de Rash
+
+```{r}
+lrt_1 <- LRtest(modeloRash, splitcr = sociodemograficos2$sexo); lrt_1
+plotGOF(lrt_1, conf = list(), tlab = "item",
+        xlab = "Women", ylab = "Men", cex.axis=1, main = 'Graphical check of the Rasch model')
+```
+
+
+```{r}
+Compr_wald <- Waldtest(modeloRash, splitcr = sociodemograficos2$sexo)
+lista_tareas <- names(tareasTRI)
+Compr_wald2 <- Compr_wald$coef.table
+Compr_wald2 <- cbind(Compr_wald2, 'Tareas' = c(lista_tareas))
+Compr_wald2 <- as.data.frame(Compr_wald2[,c(3,1,2)])
+Compr_wald2$`z-statistic` <- as.numeric(Compr_wald2$`z-statistic`)
+Compr_wald2$`p-value` <- as.numeric(Compr_wald2$`p-value`)
+Compr_wald2 <- Compr_wald2 %>% mutate_if(is.numeric, round, digits = 3)
+Compr_wald2 <-flextable(Compr_wald2)
+Compr_wald2%>% autofit() %>% align(align= 'center', part = 'all')
+
+```
+
+
+```{r}
+pp_ml_1 <- person.parameter(modeloRash)
+Infit_Outfit <- itemfit(pp_ml_1)
+Infit_Outfit 
+```
+```{r}
+Infit_Outfit_p <- personfit(pp_ml_1)
+Infit_Outfit_p 
+```
+
+
+```{r}
+plotPWmap(modeloRash, pmap = F, imap = T, horiz = F)
+plotPWmap(modeloRash, pmap = T, imap = F, horiz = F, latdim="")
+```
+### Funcionamiento diferencial de ítems
+
+```{r}
+tmp1 <- difMH(tareasTRI , group = sociodemograficos2$sexo, focal.name = 'Masculino')
+tmp1
+```
+
+```{r}
+plot(tmp1, number = T, col = 'red')
+```
+
+```{r}
+plotINFO(modeloRash,type = 'item', legpos = 'bottomleft')
+plotINFO(modeloRash,type = 'test', legpos = 'bottomleft')
+```
+
+
+
+
